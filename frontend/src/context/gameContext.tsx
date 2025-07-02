@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { AppleType } from "@/components/game/Apple";
 import { useConnection } from "@/hooks/useConnection";
 import { createContext, useState } from "react";
 
@@ -23,6 +24,14 @@ interface GameContextType {
   createRoom: (roomID: string) => void;
   startGame: () => void;
   endGame: () => void;
+  opponentApples: AppleType[];
+  setOpponentApples: React.Dispatch<React.SetStateAction<AppleType[]>>;
+  opponentScore: number;
+  setOpponentScore: React.Dispatch<React.SetStateAction<number>>;
+  myApples: AppleType[];
+  setMyApples: React.Dispatch<React.SetStateAction<AppleType[]>>;
+  myScore: number;
+  setMyScore: React.Dispatch<React.SetStateAction<number>>;
 }
 
 // const defaultGameState: GameState = {
@@ -45,6 +54,14 @@ const defaultGameContext: GameContextType = {
   createRoom: () => {},
   startGame: () => {},
   endGame: () => {},
+  opponentApples: [],
+  setOpponentApples: () => {},
+  opponentScore: 0,
+  setOpponentScore: () => {},
+  myApples: [],
+  setMyApples: () => {},
+  myScore: 0,
+  setMyScore: () => {},
 };
 
 export const GameContext = createContext<GameContextType>(defaultGameContext);
@@ -61,10 +78,14 @@ interface RoomState {
 
 export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const CONNECTION_TYPE = "apple";
-
+  const [myApples, setMyApples] = useState<AppleType[]>([]);
+  const [myScore, setMyScore] = useState<number>(0);
+  const [opponentApples, setOpponentApples] = useState<AppleType[]>([]);
+  const [opponentScore, setOpponentScore] = useState<number>(0);
   const [roomState, setRoomState] = useState<RoomState | null>(null);
   const [isGameStarted, setIsGameStarted] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+
   const { sendMessage } = useConnection();
 
   const joinRoom = (roomID: string) => {
@@ -111,6 +132,14 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         endGame,
         isGameStarted,
         setIsGameStarted,
+        opponentApples,
+        setOpponentApples,
+        opponentScore,
+        setOpponentScore,
+        myApples,
+        setMyApples,
+        myScore,
+        setMyScore,
       }}
     >
       {children}

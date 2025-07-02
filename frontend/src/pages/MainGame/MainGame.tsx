@@ -21,11 +21,20 @@ interface SelectionBox {
 }
 
 const MainGame: React.FC = () => {
-  const [apples, setApples] = useState<AppleType[]>([]);
-  const [score, setScore] = useState<number>(0);
+  // const [apples, setApples] = useState<AppleType[]>([]);
+  // const [score, setScore] = useState<number>(0);
   const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
-  const { startGame, joinRoom, roomState, readyGame, isGameStarted } =
-    useGame();
+  const {
+    startGame,
+    joinRoom,
+    roomState,
+    readyGame,
+    isGameStarted,
+    myApples,
+    setMyApples,
+    setMyScore,
+    myScore,
+  } = useGame();
   const { sendMessage } = useConnection();
   const { playerID, isReady } = usePlayer();
   const stageRef = useRef<Konva.Stage | null>(null);
@@ -55,12 +64,12 @@ const MainGame: React.FC = () => {
         });
       }
     }
-    setApples(newApples);
+    setMyApples(newApples);
   };
 
   const reset = () => {
     generateApples();
-    setScore(0);
+    setMyScore(0);
   };
 
   const playerReady = () => {
@@ -93,7 +102,7 @@ const MainGame: React.FC = () => {
     if (!selectionBox) return;
     const { startX, startY, endX, endY } = selectionBox;
 
-    const selected = apples.filter((apple) => {
+    const selected = myApples.filter((apple) => {
       const appleCenter = {
         x: apple.x + cellSize / 2,
         y: apple.y + cellSize / 2,
@@ -116,17 +125,17 @@ const MainGame: React.FC = () => {
 
     const sum = selected.reduce((acc, apple) => acc + apple.value, 0);
     if (sum === 10) {
-      setApples((prev) => prev.filter((apple) => !selected.includes(apple)));
+      setMyApples((prev) => prev.filter((apple) => !selected.includes(apple)));
       sendMessage("apple", "playing", {
-        opponentPlate: apples.map((apple) => ({
+        opponentPlate: myApples.map((apple) => ({
           id: apple.id,
           x: apple.x,
           y: apple.y,
           value: apple.value,
         })),
-        score: score + 1,
+        score: myScore + 1,
       });
-      setScore((prev) => ++prev);
+      setMyScore((prev) => ++prev);
     }
     setSelectionBox(null);
   };
@@ -220,7 +229,7 @@ const MainGame: React.FC = () => {
         <div className="mb-6 flex items-center justify-center gap-6">
           {buttonHandler()}
           <div className="text-xl font-semibold text-green-800">
-            Score: <span className="text-2xl text-green-600">{score}</span>
+            Score: <span className="text-2xl text-green-600">{myScore}</span>
           </div>
           <div className="text-xl font-semibold text-green-800">
             房間: <span className="text-2xl text-green-600">{roomID}</span>
@@ -248,7 +257,7 @@ const MainGame: React.FC = () => {
                   stroke="#22c55e"
                   strokeWidth={5}
                 />
-                {apples.map((apple) => (
+                {myApples.map((apple) => (
                   <Apple key={apple.id} apple={apple} cellSize={cellSize} />
                 ))}
                 {selectionBox && (
