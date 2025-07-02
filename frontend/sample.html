@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Apple Sum Game</title>
+    <style>
+      body {
+        text-align: center;
+        font-family: Arial, sans-serif;
+      }
+      canvas {
+        background-color: #e0f7da;
+        border: 2px solid green;
+        cursor: crosshair;
+      }
+      .controls {
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Apple Sum Game</h1>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+    <div class="controls">
+      <button onclick="resetGame()">Reset</button>
+      <span>Score: <span id="score">0</span></span>
+    </div>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      let apples = [];
+      const cellSize = 40;
+      let score = 0;
+      let selection = [];
+      let selecting = false;
+      let startX, startY, endX, endY;
+
+      function generateApples() {
+        apples = [];
+        for (let row = 0; row < 10; row++) {
+          for (let col = 0; col < 15; col++) {
+            apples.push({
+              x: col * cellSize + 10,
+              y: row * cellSize + 10,
+              value: Math.floor(Math.random() * 9) + 1,
+            });
+          }
+        }
+      }
+
+      function drawSelectionBox() {
+        if (selecting) {
+          ctx.fillStyle = "rgba(255, 255, 0, 0.3)";
+          ctx.fillRect(
+            Math.min(startX, endX),
+            Math.min(startY, endY),
+            Math.abs(endX - startX),
+            Math.abs(endY - startY)
+          );
+        }
+      }
+
+      function drawApples() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        apples.forEach((apple) => {
+          ctx.beginPath();
+          ctx.arc(
+            apple.x + cellSize / 2,
+            apple.y + cellSize / 2,
+            15,
+            0,
+            Math.PI * 2
+          );
+          ctx.fillStyle = "red";
+          ctx.fill();
+          ctx.strokeStyle = "black";
+          ctx.stroke();
+          ctx.fillStyle = "white";
+          ctx.font = "16px Arial";
+          ctx.fillText(
+            apple.value,
+            apple.x + cellSize / 2 - 5,
+            apple.y + cellSize / 2 + 5
+          );
+        });
+        drawSelectionBox();
+      }
+
+      function resetGame() {
+        generateApples();
+        score = 0;
+        document.getElementById("score").innerText = score;
+        drawApples();
+      }
+
+      canvas.addEventListener("mousedown", (e) => {
+        startX = e.offsetX;
+        startY = e.offsetY;
+        selecting = true;
+        selection = [];
+      });
+
+      canvas.addEventListener("mousemove", (e) => {
+        if (selecting) {
+          endX = e.offsetX;
+          endY = e.offsetY;
+          drawApples();
+        }
+      });
+
+      canvas.addEventListener("mouseup", (e) => {
+        endX = e.offsetX;
+        endY = e.offsetY;
+        selecting = false;
+        selection = apples.filter(
+          (apple) =>
+            apple.x + cellSize > Math.min(startX, endX) &&
+            apple.x < Math.max(startX, endX) &&
+            apple.y + cellSize > Math.min(startY, endY) &&
+            apple.y < Math.max(startY, endY)
+        );
+        checkSum();
+        drawApples();
+      });
+
+      function checkSum() {
+        let sum = selection.reduce((acc, apple) => acc + apple.value, 0);
+        if (sum === 10) {
+          score += selection.length;
+          document.getElementById("score").innerText = score;
+          apples = apples.filter((apple) => !selection.includes(apple));
+        }
+      }
+
+      generateApples();
+      drawApples();
+    </script>
+  </body>
+</html>
