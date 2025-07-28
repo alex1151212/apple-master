@@ -4,10 +4,11 @@ import React, { useEffect, useRef, useState } from "react";
 import { Group, Layer, Rect, Stage } from "react-konva";
 import Apple, { AppleType } from "../../components/game/Apple";
 import Timer from "../../components/game/Timer";
-import { useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useGame } from "@/hooks/useGame";
 import { useConnection } from "@/hooks/useConnection";
 import { usePlayer } from "@/hooks/usePlayer";
+import { useRoom } from "@/hooks/useRoom";
 
 const cellSize = 40;
 const rows = 10;
@@ -21,26 +22,23 @@ interface SelectionBox {
 }
 
 const MainGame: React.FC = () => {
-  // const [apples, setApples] = useState<AppleType[]>([]);
-  // const [score, setScore] = useState<number>(0);
   const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
+  
   const {
     startGame,
-    joinRoom,
-    roomState,
     readyGame,
     isGameStarted,
-    myApples,
-    setMyApples,
-    setMyScore,
-    myScore,
+    gameState,
+    setGameState,
+    isConnectedGame,
   } = useGame();
+
+  const { roomState, setRoomState, joinRoom } = useRoom();
   const { sendMessage } = useConnection();
   const { playerID, isReady } = usePlayer();
   const stageRef = useRef<Konva.Stage | null>(null);
   const { roomID } = useParams();
   const navigate = useNavigate();
-  // const { apples: gameApples, score: gameScore, sendMessage } = useGame();
 
   useEffect(() => {
     reset();
@@ -64,12 +62,17 @@ const MainGame: React.FC = () => {
         });
       }
     }
-    setMyApples(newApples);
+    return newApples;
   };
 
   const reset = () => {
-    generateApples();
-    setMyScore(0);
+    setGameState((prev) => ({
+      ...prev,
+      apples: generateApples(),
+      score: 0,
+      opponentApples: [],
+      opponentScore: 0,
+    }));
   };
 
   const playerReady = () => {
@@ -84,6 +87,7 @@ const MainGame: React.FC = () => {
   };
 
   const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (!isGameStarted) return;
     const stage = e.target.getStage();
     if (stage === null) return;
     const { x, y } = stage.getPointerPosition() as Vector2d;
@@ -91,6 +95,7 @@ const MainGame: React.FC = () => {
   };
 
   const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (!isGameStarted) return;
     const stage = e.target.getStage();
     if (stage === null) return;
     if (selectionBox === null) return;
@@ -99,10 +104,11 @@ const MainGame: React.FC = () => {
   };
 
   const handleMouseUp = () => {
+    if (!isGameStarted) return;
     if (!selectionBox) return;
     const { startX, startY, endX, endY } = selectionBox;
 
-    const selected = myApples.filter((apple) => {
+    const selected = gameState.apples.filter((apple) => {
       const appleCenter = {
         x: apple.x + cellSize / 2,
         y: apple.y + cellSize / 2,
@@ -125,17 +131,17 @@ const MainGame: React.FC = () => {
 
     const sum = selected.reduce((acc, apple) => acc + apple.value, 0);
     if (sum === 10) {
-      setMyApples((prev) => prev.filter((apple) => !selected.includes(apple)));
+      setGameState((prev) => ({
+        ...prev,
+        apples: prev.apples.filter((apple) => !selected.includes(apple)),
+        score: prev.score + 1,
+      }));
       sendMessage("apple", "playing", {
-        opponentPlate: myApples.map((apple) => ({
-          id: apple.id,
-          x: apple.x,
-          y: apple.y,
-          value: apple.value,
-        })),
-        score: myScore + 1,
+        opponentPlate: gameState.apples.filter(
+          (apple) => !selected.includes(apple)
+        ),
+        opponentScore: gameState.score + 1,
       });
-      setMyScore((prev) => ++prev);
     }
     setSelectionBox(null);
   };
@@ -219,6 +225,8 @@ const MainGame: React.FC = () => {
     }
   };
 
+  if (!isConnectedGame) return <Navigate to="/" />;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-green-100 py-8">
       <div className="max-w-4xl mx-auto px-4">
@@ -229,61 +237,99 @@ const MainGame: React.FC = () => {
         <div className="mb-6 flex items-center justify-center gap-6">
           {buttonHandler()}
           <div className="text-xl font-semibold text-green-800">
-            Score: <span className="text-2xl text-green-600">{myScore}</span>
+            Score:{" "}
+            <span className="text-2xl text-green-600">{gameState.score}</span>
           </div>
           <div className="text-xl font-semibold text-green-800">
             房間: <span className="text-2xl text-green-600">{roomID}</span>
           </div>
         </div>
 
-        <div className="flex justify-center">
-          <Stage
-            width={620}
-            height={600}
-            ref={stageRef}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-          >
-            <Layer>
-              <Group>
-                <Rect
-                  x={0}
-                  y={0}
-                  width={620}
-                  height={520}
-                  fill="#f0fdf4"
-                  cornerRadius={12}
-                  stroke="#22c55e"
-                  strokeWidth={5}
-                />
-                {myApples.map((apple) => (
-                  <Apple key={apple.id} apple={apple} cellSize={cellSize} />
-                ))}
-                {selectionBox && (
+        <div className="flex justify-center gap-8">
+          {/* 玩家盤面 */}
+          <div className="flex flex-col items-center">
+            <h3 className="text-lg font-semibold text-green-700 mb-2">
+              我的盤面
+            </h3>
+            <Stage
+              width={620}
+              height={600}
+              ref={stageRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+            >
+              <Layer>
+                <Group>
                   <Rect
-                    x={Math.min(selectionBox.startX, selectionBox.endX)}
-                    y={Math.min(selectionBox.startY, selectionBox.endY)}
-                    width={Math.abs(selectionBox.endX - selectionBox.startX)}
-                    height={Math.abs(selectionBox.endY - selectionBox.startY)}
-                    fill="rgba(134, 239, 172, 0.3)"
-                    stroke="#86efac"
-                    strokeWidth={2}
+                    x={0}
+                    y={0}
+                    width={620}
+                    height={520}
+                    fill="#f0fdf4"
+                    cornerRadius={12}
+                    stroke="#22c55e"
+                    strokeWidth={5}
                   />
-                )}
-              </Group>
-              <Group>
-                <Timer
-                  initialTime={120}
-                  onTimeUp={handleTimeUp}
-                  width={600}
-                  y={450}
-                  isStarted={isGameStarted}
-                />
-              </Group>
-            </Layer>
-          </Stage>
-          <div></div>
+                  {gameState.apples.map((apple) => (
+                    <Apple key={apple.id} apple={apple} cellSize={cellSize} />
+                  ))}
+                  {selectionBox && (
+                    <Rect
+                      x={Math.min(selectionBox.startX, selectionBox.endX)}
+                      y={Math.min(selectionBox.startY, selectionBox.endY)}
+                      width={Math.abs(selectionBox.endX - selectionBox.startX)}
+                      height={Math.abs(selectionBox.endY - selectionBox.startY)}
+                      fill="rgba(134, 239, 172, 0.3)"
+                      stroke="#86efac"
+                      strokeWidth={2}
+                    />
+                  )}
+                </Group>
+                <Group>
+                  <Timer
+                    initialTime={120}
+                    onTimeUp={handleTimeUp}
+                    width={600}
+                    y={450}
+                    isStarted={isGameStarted}
+                  />
+                </Group>
+              </Layer>
+            </Stage>
+          </div>
+
+          {/* 對手盤面 */}
+          <div className="flex flex-col items-center">
+            <h3 className="text-lg font-semibold text-red-700 mb-2">
+              對手盤面
+            </h3>
+            <Stage width={620} height={600}>
+              <Layer>
+                <Group>
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={620}
+                    height={520}
+                    fill="#fef2f2"
+                    cornerRadius={12}
+                    stroke="#ef4444"
+                    strokeWidth={5}
+                  />
+                  {gameState.opponentApples.map((apple) => (
+                    <Apple key={apple.id} apple={apple} cellSize={cellSize} />
+                  ))}
+                </Group>
+              </Layer>
+            </Stage>
+            <div className="mt-2 text-lg font-semibold text-red-800">
+              對手分數:{" "}
+              <span className="text-xl text-red-600">
+                {gameState.opponentScore}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

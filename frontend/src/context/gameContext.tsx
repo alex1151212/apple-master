@@ -1,67 +1,46 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AppleType } from "@/components/game/Apple";
 import { useConnection } from "@/hooks/useConnection";
-import { createContext, useState } from "react";
+import { usePlayer } from "@/hooks/usePlayer";
+import { useRoom } from "@/hooks/useRoom";
+import { createContext, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-// interface GameState {
-//   apples: number;
-//   score: number;
-// }
+const initialGameState: GameState = {
+  apples: [],
+  score: 0,
+  opponentApples: [],
+  opponentScore: 0,
+};
 
 interface GameContextType {
-  //   apples: number;
-  //   score: number;
-  roomState: RoomState | null;
+  // roomState: RoomState | null;
   isGameStarted: boolean;
   setIsGameStarted: (isGameStarted: boolean) => void;
-  setRoomState: (roomState: RoomState) => void;
-  isConnected: boolean;
-  setIsConnected: (isConnected: boolean) => void;
+  // setRoomState: (roomState: RoomState) => void;
+  isConnectedGame: boolean;
+  setIsConnectedGame: (isConnectedGame: boolean) => void;
   connectGame: (playerID: string) => void;
   sendMessage: (type: string, payload?: any) => void;
-  joinRoom: (roomID: string) => void;
   readyGame: () => void;
-  createRoom: (roomID: string) => void;
   startGame: () => void;
   endGame: () => void;
-  opponentApples: AppleType[];
-  setOpponentApples: React.Dispatch<React.SetStateAction<AppleType[]>>;
-  opponentScore: number;
-  setOpponentScore: React.Dispatch<React.SetStateAction<number>>;
-  myApples: AppleType[];
-  setMyApples: React.Dispatch<React.SetStateAction<AppleType[]>>;
-  myScore: number;
-  setMyScore: React.Dispatch<React.SetStateAction<number>>;
+  gameState: GameState;
+  setGameState: React.Dispatch<React.SetStateAction<GameState>>;
 }
 
-// const defaultGameState: GameState = {
-//   apples: 0,
-//   score: 0,
-// };
-
 const defaultGameContext: GameContextType = {
-  //   ...defaultGameState,
-  isConnected: false,
-  setIsConnected: () => {},
-  roomState: null,
+  isConnectedGame: false,
+  setIsConnectedGame: () => {},
   isGameStarted: false,
   setIsGameStarted: () => {},
-  setRoomState: () => {},
   connectGame: () => {},
   sendMessage: () => {},
-  joinRoom: () => {},
   readyGame: () => {},
-  createRoom: () => {},
   startGame: () => {},
   endGame: () => {},
-  opponentApples: [],
-  setOpponentApples: () => {},
-  opponentScore: 0,
-  setOpponentScore: () => {},
-  myApples: [],
-  setMyApples: () => {},
-  myScore: 0,
-  setMyScore: () => {},
+  gameState: initialGameState,
+  setGameState: () => {},
 };
 
 export const GameContext = createContext<GameContextType>(defaultGameContext);
@@ -70,31 +49,34 @@ interface GameProviderProps {
   children: React.ReactNode;
 }
 
-interface RoomState {
-  id: string;
-  owner: string;
-  status: "waiting" | "ready" | "playing";
+interface GameState {
+  apples: AppleType[];
+  score: number;
+  opponentApples: AppleType[];
+  opponentScore: number;
 }
 
 export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const CONNECTION_TYPE = "apple";
-  const [myApples, setMyApples] = useState<AppleType[]>([]);
-  const [myScore, setMyScore] = useState<number>(0);
-  const [opponentApples, setOpponentApples] = useState<AppleType[]>([]);
-  const [opponentScore, setOpponentScore] = useState<number>(0);
-  const [roomState, setRoomState] = useState<RoomState | null>(null);
+  const navigate = useNavigate();
+  const { roomState, setRoomState, setRoomList } = useRoom();
+  const { setPlayerID, setIsReady } = usePlayer();
+
+  const [gameState, setGameState] = useState<GameState>({
+    apples: [],
+    score: 0,
+    opponentApples: [],
+    opponentScore: 0,
+  });
+
   const [isGameStarted, setIsGameStarted] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnectedGame, setIsConnectedGame] = useState(false);
 
-  const { sendMessage } = useConnection();
-
-  const joinRoom = (roomID: string) => {
-    sendMessage(CONNECTION_TYPE, "join", { roomID });
-  };
-
-  const createRoom = (roomID: string) => {
-    joinRoom(roomID);
-  };
+  const {
+    connect: connectWs,
+    sendMessage,
+    // isConnected: isConnectedWs,
+  } = useConnection();
 
   const connectGame = (playerID: string) => {
     sendMessage(CONNECTION_TYPE, "connect", { playerID });
@@ -116,30 +98,79 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
     sendMessage(CONNECTION_TYPE, "message", payload);
   };
 
+  const handleMessage = (data: any) => {
+    if (!data) return;
+    const { type, payload, success } = data;
+    switch (type) {
+      case "connect":
+        if (!success) return;
+        setPlayerID(payload.playerID);
+        setIsConnectedGame(true);
+        break;
+      case "lobby:getRoomList":
+        if (!success) return;
+        setRoomList(payload.roomList);
+        break;
+      case "lobby:join":
+        if (!success) return;
+        setIsReady(false);
+        setRoomState({
+          id: payload.roomID,
+          owner: payload.roomState.owner,
+          status: payload.roomState.status,
+        });
+        navigate(`/room/${payload.roomID}`);
+        break;
+      case "room:ready":
+        if (!success) return;
+        setIsReady(true);
+        setRoomState({
+          id: payload.roomID,
+          owner: payload.roomState.owner,
+          status: payload.roomState.status,
+        });
+        break;
+      case "room:start":
+        if (!success) return;
+        setIsGameStarted(true);
+        setRoomState({
+          id: payload.roomID,
+          owner: payload.roomState.owner,
+          status: payload.roomState.status,
+        });
+
+        break;
+      case "playing":
+        if (!success) return;
+        setGameState((prev) => ({
+          ...prev,
+          opponentApples: payload.opponentPlate,
+          opponentScore: payload.opponentScore,
+        }));
+        break;
+    }
+  };
+
+  useEffect(() => {
+    connectWs(handleMessage);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <GameContext.Provider
       value={{
-        isConnected,
-        setIsConnected,
+        isConnectedGame,
+        setIsConnectedGame,
         sendMessage: sendMessageToRoom,
         connectGame,
-        roomState,
-        setRoomState,
-        joinRoom,
-        createRoom,
         readyGame,
         startGame,
         endGame,
         isGameStarted,
         setIsGameStarted,
-        opponentApples,
-        setOpponentApples,
-        opponentScore,
-        setOpponentScore,
-        myApples,
-        setMyApples,
-        myScore,
-        setMyScore,
+        gameState,
+        setGameState,
       }}
     >
       {children}

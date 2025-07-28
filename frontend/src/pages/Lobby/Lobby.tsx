@@ -1,123 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { instance } from "@/api/axios";
-import { useConnection } from "@/hooks/useConnection";
+import { Room } from "@/context/roomContext";
 import { useGame } from "@/hooks/useGame";
 import { usePlayer } from "@/hooks/usePlayer";
-export enum RoomStatusEnum {
-  WAITING = "waiting",
-  READY = "ready",
-  PLAYING = "playing",
-  END = "end",
-}
-interface Room {
-  id: string;
-  clients: RoomClient[];
-  owner: RoomClient;
-  status: RoomStatusEnum;
-}
-interface RoomClient {
-  playerID: string;
-  currentRoomID: string | null;
-  isReady: boolean;
-}
+import { useRoom } from "@/hooks/useRoom";
+import { useState } from "react";
 
 const Lobby = () => {
-  const [roomList, setRoomList] = useState<Room[]>([]);
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [newRoomId, setNewRoomId] = useState("");
-  const {
-    roomState,
-    setRoomState,
-    setIsConnected,
-    isConnected,
-    connectGame,
-    isGameStarted,
-    setIsGameStarted,
-  } = useGame();
-  const [tmpPlayerID, setTmpPlayerID] = useState(""); // 暫存玩家ID
-  const { playerID, setPlayerID, setIsReady } = usePlayer();
-  const {
-    connect: connectWs,
-    isConnected: isConnectedWs,
-    sendMessage,
-  } = useConnection();
-  const navigate = useNavigate();
-
-  const handleMessage = (data: any) => {
-    if (!data) return;
-    const { type, payload, success } = data;
-    switch (type) {
-      case "connect":
-        if (success) {
-          setPlayerID(payload.playerID);
-          setIsConnected(true);
-        } else {
-          setIsConnected(false);
-        }
-        break;
-      case "lobby:getRoomList":
-        setRoomList(payload.roomList);
-        break;
-      case "lobby:join":
-        if (success) {
-          setIsReady(false);
-          setRoomState({
-            id: payload.roomID,
-            owner: payload.roomState.owner,
-            status: payload.roomState.status,
-          });
-          navigate(`/room/${payload.roomID}`);
-        }
-        break;
-      case "room:ready":
-        if (success) {
-          setIsReady(true);
-          setRoomState({
-            id: payload.roomID,
-            owner: payload.roomState.owner,
-            status: payload.roomState.status,
-          });
-        }
-        break;
-      case "room:start":
-        if (success) {
-          setIsGameStarted(true);
-          setRoomState({
-            id: payload.roomID,
-            owner: payload.roomState.owner,
-            status: payload.roomState.status,
-          });
-        }
-        break;
-    }
-  };
-
-  // 取得房間列表
-  // const getRoomList = async () => {
-  //   const { data } = await instance.get("/api/rooms");
-  //   setRoomList(data.data);
-  // };
-
-  // 加入房間
-  const handleJoinRoom = (roomID: string) => {
-    if (!playerID.trim()) {
-      alert("請先輸入您的名字！");
-      return;
-    }
-    if (!isConnectedWs) {
-      alert("請先連線！");
-      return;
-    }
-    sendMessage("apple", "join", { roomID });
-  };
-
-  useEffect(() => {
-    connectWs(handleMessage);
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { connectGame, isConnectedGame } = useGame();
+  const [tmpPlayerID, setTmpPlayerID] = useState("");
+  const { playerID } = usePlayer();
+  const { roomList } = useRoom();
 
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
@@ -127,7 +21,7 @@ const Lobby = () => {
             遊戲大廳
           </h1>
 
-          {playerID && isConnected ? (
+          {playerID && isConnectedGame ? (
             <div className="text-center text-2xl font-semibold text-gray-800 mb-10">
               玩家名稱: {playerID}
             </div>
@@ -174,16 +68,11 @@ const Lobby = () => {
               setNewRoomId={setNewRoomId}
               setShowCreateRoom={setShowCreateRoom}
               showCreateRoom={showCreateRoom}
-              handleJoinRoom={handleJoinRoom}
             />
 
             <div className="grid gap-4">
               {roomList.map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  handleJoinRoom={handleJoinRoom}
-                />
+                <RoomCard key={room.id} room={room} />
               ))}
               {roomList.length === 0 && (
                 <p className="text-center text-gray-500 py-4">
@@ -205,14 +94,13 @@ const CreateRoomModal = ({
   setNewRoomId,
   setShowCreateRoom,
   showCreateRoom,
-  handleJoinRoom,
 }: {
   newRoomId: string;
   setNewRoomId: (id: string) => void;
   setShowCreateRoom: (show: boolean) => void;
   showCreateRoom: boolean;
-  handleJoinRoom: (id: string) => void;
 }) => {
+  const { joinRoom } = useRoom();
   if (!showCreateRoom) return null;
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
@@ -234,7 +122,7 @@ const CreateRoomModal = ({
           </button>
           <button
             onClick={() => {
-              handleJoinRoom(newRoomId);
+              joinRoom(newRoomId);
               setShowCreateRoom(false);
             }}
             className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 cursor-pointer"
@@ -247,13 +135,8 @@ const CreateRoomModal = ({
   );
 };
 
-const RoomCard = ({
-  room,
-  handleJoinRoom,
-}: {
-  room: Room;
-  handleJoinRoom: (id: string) => void;
-}) => {
+const RoomCard = ({ room }: { room: Room }) => {
+  const { joinRoom } = useRoom();
   return (
     <div
       key={room.id}
@@ -264,7 +147,7 @@ const RoomCard = ({
         <p className="text-sm text-gray-500">玩家數: {room.clients.length}/2</p>
       </div>
       <button
-        onClick={() => handleJoinRoom(room.id)}
+        onClick={() => joinRoom(room.id)}
         className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition-colors"
         disabled={room.clients.length >= 2}
       >

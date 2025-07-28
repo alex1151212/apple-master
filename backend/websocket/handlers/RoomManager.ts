@@ -83,13 +83,19 @@ export class RoomManager implements MessageHandler {
     });
   }
 
-  private broadcastToRoom(client: RoomClient, message: string) {
-    const ws = client.ws;
+  private broadcastToRoom(
+    client: RoomClient,
+    message: string,
+    exclude?: RoomClient[]
+  ) {
     if (client?.currentRoomID) {
       const room = this.rooms.get(client.currentRoomID);
       if (room) {
-        room.clients.forEach(({ ws: clientWs }) => {
-          if (clientWs.readyState === WebSocket.OPEN) {
+        room.clients.forEach(({ playerID, ws: clientWs }) => {
+          if (
+            clientWs.readyState === WebSocket.OPEN &&
+            !exclude?.some((e) => e.playerID === playerID)
+          ) {
             clientWs.send(message);
           }
         });
@@ -417,12 +423,13 @@ export class RoomManager implements MessageHandler {
           client,
           JSON.stringify({
             type: "playing",
-            opponent: {
-              id: room.clients.find((client) => client.playerID !== ws.playerID)
-                ?.playerID,
-              plate,
+            success: true,
+            payload: {
+              opponentPlate: payload.opponentPlate,
+              opponentScore: payload.opponentScore,
             },
-          })
+          }),
+          [client]
         );
 
         break;

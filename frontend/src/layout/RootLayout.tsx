@@ -1,18 +1,21 @@
 import { Outlet } from "react-router-dom";
 import { ConnectionProvider } from "@/context/connectionContext";
 import { GameProvider } from "@/context/gameContext";
+import { RoomProvider } from "@/context/roomContext";
 import { PlayerProvider } from "@/context/playerContext";
 
 const RootLayout = () => {
   return (
     <ConnectionProvider>
-      <GameProvider>
-        <PlayerProvider>
-          <div>
-            <Outlet />
-          </div>
-        </PlayerProvider>
-      </GameProvider>
+      <PlayerProvider>
+        <RoomProvider>
+          <GameProvider>
+            <div>
+              <Outlet />
+            </div>
+          </GameProvider>
+        </RoomProvider>
+      </PlayerProvider>
     </ConnectionProvider>
   );
 };

@@ -2,6 +2,7 @@
 import { createContext, useRef, useState } from "react";
 
 interface ConnectionContextType {
+  CONNECTION_TYPE: string;
   // playerID: string | null;
   isConnected: boolean;
   connect: (handleMessage: (data: any) => void) => void;
@@ -10,6 +11,7 @@ interface ConnectionContextType {
 }
 
 const defaultConnectionContext: ConnectionContextType = {
+  CONNECTION_TYPE: "apple",
   // playerID: null,
   isConnected: false,
   connect: () => {},
@@ -58,6 +60,7 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({
   return (
     <ConnectionContext.Provider
       value={{
+        CONNECTION_TYPE: "apple",
         // playerID,
         isConnected,
         connect,
