@@ -1,18 +1,14 @@
+import { CELL_SIZE } from "@/context/gameContext";
+import { useGame } from "@/hooks/useGame";
+import { usePlayer } from "@/hooks/usePlayer";
+import { useRoom } from "@/hooks/useRoom";
 import Konva from "konva";
 import { Vector2d } from "konva/lib/types";
 import React, { useEffect, useRef, useState } from "react";
 import { Group, Layer, Rect, Stage } from "react-konva";
-import Apple, { AppleType } from "../../components/game/Apple";
-import Timer from "../../components/game/Timer";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { useGame } from "@/hooks/useGame";
-import { useConnection } from "@/hooks/useConnection";
-import { usePlayer } from "@/hooks/usePlayer";
-import { useRoom } from "@/hooks/useRoom";
-
-const cellSize = 40;
-const rows = 10;
-const cols = 15;
+import Apple from "../../components/game/Apple";
+import Timer from "../../components/game/Timer";
 
 interface SelectionBox {
   startX: number;
@@ -23,7 +19,7 @@ interface SelectionBox {
 
 const MainGame: React.FC = () => {
   const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null);
-  
+
   const {
     startGame,
     readyGame,
@@ -31,17 +27,19 @@ const MainGame: React.FC = () => {
     gameState,
     setGameState,
     isConnectedGame,
+    resetGame,
+    syncGame,
   } = useGame();
 
-  const { roomState, setRoomState, joinRoom } = useRoom();
-  const { sendMessage } = useConnection();
+  const { roomState, joinRoom } = useRoom();
   const { playerID, isReady } = usePlayer();
+  
   const stageRef = useRef<Konva.Stage | null>(null);
   const { roomID } = useParams();
   const navigate = useNavigate();
 
   useEffect(() => {
-    reset();
+    resetGame();
     if (roomID) {
       joinRoom(roomID);
     } else {
@@ -49,42 +47,6 @@ const MainGame: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const generateApples = () => {
-    const newApples: AppleType[] = [];
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        newApples.push({
-          id: `${row}-${col}`,
-          x: col * cellSize + 10,
-          y: row * cellSize + 10,
-          value: Math.floor(Math.random() * 9) + 1,
-        });
-      }
-    }
-    return newApples;
-  };
-
-  const reset = () => {
-    setGameState((prev) => ({
-      ...prev,
-      apples: generateApples(),
-      score: 0,
-      opponentApples: [],
-      opponentScore: 0,
-    }));
-  };
-
-  const playerReady = () => {
-    sendMessage("apple", "ready");
-  };
-
-  const start = () => {
-    reset();
-  };
-  const leave = () => {
-    // navigate("/");
-  };
 
   const handleMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     if (!isGameStarted) return;
@@ -110,8 +72,8 @@ const MainGame: React.FC = () => {
 
     const selected = gameState.apples.filter((apple) => {
       const appleCenter = {
-        x: apple.x + cellSize / 2,
-        y: apple.y + cellSize / 2,
+        x: apple.x + CELL_SIZE / 2,
+        y: apple.y + CELL_SIZE / 2,
       };
       const selectionArea = {
         left: Math.min(startX, endX),
@@ -136,12 +98,10 @@ const MainGame: React.FC = () => {
         apples: prev.apples.filter((apple) => !selected.includes(apple)),
         score: prev.score + 1,
       }));
-      sendMessage("apple", "playing", {
-        opponentPlate: gameState.apples.filter(
-          (apple) => !selected.includes(apple)
-        ),
-        opponentScore: gameState.score + 1,
-      });
+      syncGame(
+        gameState.apples.filter((apple) => !selected.includes(apple)),
+        gameState.score + 1
+      );
     }
     setSelectionBox(null);
   };
@@ -185,7 +145,6 @@ const MainGame: React.FC = () => {
     ) {
       return (
         <button
-          onClick={playerReady}
           disabled={isReady}
           className={`px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700
                          transition-colors duration-200 font-semibold shadow-md ${
@@ -272,7 +231,7 @@ const MainGame: React.FC = () => {
                     strokeWidth={5}
                   />
                   {gameState.apples.map((apple) => (
-                    <Apple key={apple.id} apple={apple} cellSize={cellSize} />
+                    <Apple key={apple.id} apple={apple} cellSize={CELL_SIZE} />
                   ))}
                   {selectionBox && (
                     <Rect
@@ -318,7 +277,7 @@ const MainGame: React.FC = () => {
                     strokeWidth={5}
                   />
                   {gameState.opponentApples.map((apple) => (
-                    <Apple key={apple.id} apple={apple} cellSize={cellSize} />
+                    <Apple key={apple.id} apple={apple} cellSize={CELL_SIZE} />
                   ))}
                 </Group>
               </Layer>
