@@ -61,7 +61,8 @@ export const RoomProvider: React.FC<RoomProviderProps> = ({ children }) => {
 
   const joinRoom = (roomID: string) => {
     if (!playerID.trim()) {
-      alert("請先輸入您的名字！");
+      // alert("請先輸入您的名字！");
+      console.log("請先輸入您的名字！");
       return;
     }
     if (!isConnectedWs) {

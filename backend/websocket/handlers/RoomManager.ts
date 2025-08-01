@@ -217,7 +217,6 @@ export class RoomManager implements MessageHandler {
           ws.send(
             JSON.stringify({
               type: "lobby:join",
-
               success: false,
               payload: {
                 roomID: roomID,
@@ -395,9 +394,30 @@ export class RoomManager implements MessageHandler {
         }
         return;
       }
+      case "gameInit": {
+        const client = this.clients.get(ws);
+        if (!client) {
+          return;
+        }
+        const room = this.rooms.get(client.currentRoomID!);
+        if (!room) {
+          return;
+        }
+        this.broadcastToRoom(
+          client,
+          JSON.stringify({
+            type: "gameInit",
+            success: true,
+            payload: {
+              opponentPlate: payload.plate,
+            },
+          }),
+          [client]
+        );
+        break;
+      }
       // 若房間內有玩家傳送playing 則廣播給所有玩家
       case "playing": {
-        const { plate } = payload;
         const client = this.clients.get(ws);
         if (!client?.currentRoomID) {
           return;
@@ -407,7 +427,6 @@ export class RoomManager implements MessageHandler {
           ws.send(
             JSON.stringify({
               type: "playing",
-
               success: false,
               data: {
                 message: "房間未開始",
@@ -425,8 +444,10 @@ export class RoomManager implements MessageHandler {
             type: "playing",
             success: true,
             payload: {
-              opponentPlate: payload.opponentPlate,
-              opponentScore: payload.opponentScore,
+              opponentPlate: payload.plate,
+              opponentScore: payload.score,
+              lockedColumnCount: payload.opponentLockedColumnCount,
+              opponentLockedColumnCount: payload.lockedColumnCount,
             },
           }),
           [client]

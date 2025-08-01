@@ -1,4 +1,4 @@
-import { CELL_SIZE } from "@/context/gameContext";
+import { CELL_SIZE, COLS } from "@/context/gameContext";
 import { useGame } from "@/hooks/useGame";
 import { usePlayer } from "@/hooks/usePlayer";
 import { useRoom } from "@/hooks/useRoom";
@@ -24,6 +24,7 @@ const MainGame: React.FC = () => {
     startGame,
     readyGame,
     isGameStarted,
+    setIsGameStarted,
     gameState,
     setGameState,
     isConnectedGame,
@@ -33,7 +34,7 @@ const MainGame: React.FC = () => {
 
   const { roomState, joinRoom } = useRoom();
   const { playerID, isReady } = usePlayer();
-  
+
   const stageRef = useRef<Konva.Stage | null>(null);
   const { roomID } = useParams();
   const navigate = useNavigate();
@@ -92,22 +93,26 @@ const MainGame: React.FC = () => {
     });
 
     const sum = selected.reduce((acc, apple) => acc + apple.value, 0);
-    if (sum === 10) {
-      setGameState((prev) => ({
-        ...prev,
-        apples: prev.apples.filter((apple) => !selected.includes(apple)),
-        score: prev.score + 1,
-      }));
+    if (sum === 10 && selected.every((apple) => !apple.isLocked)) {
+      setGameState((prev) => {
+        return {
+          ...prev,
+          apples: prev.apples.filter((apple) => !selected.includes(apple)),
+          score: prev.score + 1,
+        };
+      });
       syncGame(
         gameState.apples.filter((apple) => !selected.includes(apple)),
-        gameState.score + 1
+        gameState.score + 1,
+        gameState.opponentLockedColumnCount + 1
       );
     }
     setSelectionBox(null);
   };
 
   const handleTimeUp = () => {
-    console.log("Time's up!");
+    setIsGameStarted(false);
+    resetGame();
   };
 
   const buttonHandler = () => {
@@ -230,9 +235,22 @@ const MainGame: React.FC = () => {
                     stroke="#22c55e"
                     strokeWidth={5}
                   />
-                  {gameState.apples.map((apple) => (
-                    <Apple key={apple.id} apple={apple} cellSize={CELL_SIZE} />
-                  ))}
+                  {gameState.apples.map((apple) => {
+                    const position = {
+                      x: parseInt(apple.id.split("-")[1]),
+                      y: parseInt(apple.id.split("-")[0]),
+                    };
+                    return (
+                      <Apple
+                        key={apple.id}
+                        apple={apple}
+                        cellSize={CELL_SIZE}
+                        isLocked={
+                          COLS - gameState.lockedColumnCount === position.x
+                        }
+                      />
+                    );
+                  })}
                   {selectionBox && (
                     <Rect
                       x={Math.min(selectionBox.startX, selectionBox.endX)}
@@ -276,9 +294,23 @@ const MainGame: React.FC = () => {
                     stroke="#ef4444"
                     strokeWidth={5}
                   />
-                  {gameState.opponentApples.map((apple) => (
-                    <Apple key={apple.id} apple={apple} cellSize={CELL_SIZE} />
-                  ))}
+                  {gameState.opponentApples.map((apple) => {
+                    const position = {
+                      x: parseInt(apple.id.split("-")[1]),
+                      y: parseInt(apple.id.split("-")[0]),
+                    };
+                    return (
+                      <Apple
+                        key={apple.id}
+                        apple={apple}
+                        cellSize={CELL_SIZE}
+                        isLocked={
+                          COLS - gameState.opponentLockedColumnCount ===
+                          position.x
+                        }
+                      />
+                    );
+                  })}
                 </Group>
               </Layer>
             </Stage>

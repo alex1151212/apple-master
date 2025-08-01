@@ -11,6 +11,8 @@ const initialGameState: GameState = {
   score: 0,
   opponentApples: [],
   opponentScore: 0,
+  lockedColumnCount: 0,
+  opponentLockedColumnCount: 0,
 };
 
 export const CONNECTION_TYPE = "apple";
@@ -33,7 +35,12 @@ interface GameContextType {
   gameState: GameState;
   setGameState: React.Dispatch<React.SetStateAction<GameState>>;
   resetGame: () => void;
-  syncGame: (apples: AppleType[], score: number) => void;
+  syncGame: (
+    apples: AppleType[],
+    score: number,
+    lockColumnCount: number
+  ) => void;
+  initGame: () => void;
 }
 
 const defaultGameContext: GameContextType = {
@@ -50,6 +57,7 @@ const defaultGameContext: GameContextType = {
   setGameState: () => {},
   resetGame: () => {},
   syncGame: () => {},
+  initGame: () => {},
 };
 
 export const GameContext = createContext<GameContextType>(defaultGameContext);
@@ -63,6 +71,8 @@ interface GameState {
   score: number;
   opponentApples: AppleType[];
   opponentScore: number;
+  lockedColumnCount: number;
+  opponentLockedColumnCount: number;
 }
 
 export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
@@ -70,12 +80,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   const { roomState, setRoomState, setRoomList } = useRoom();
   const { setPlayerID, setIsReady } = usePlayer();
 
-  const [gameState, setGameState] = useState<GameState>({
-    apples: [],
-    score: 0,
-    opponentApples: [],
-    opponentScore: 0,
-  });
+  const [gameState, setGameState] = useState<GameState>(initialGameState);
 
   const [isGameStarted, setIsGameStarted] = useState(false);
   const [isConnectedGame, setIsConnectedGame] = useState(false);
@@ -92,6 +97,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
       for (let col = 0; col < COLS; col++) {
         newApples.push({
           id: `${row}-${col}`,
+          isLocked: false,
           x: col * CELL_SIZE + 10,
           y: row * CELL_SIZE + 10,
           value: Math.floor(Math.random() * 9) + 1,
@@ -106,21 +112,31 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   };
 
   const readyGame = () => {
-    sendMessage(CONNECTION_TYPE, "ready", { roomID: roomState?.id });
+    sendMessage(CONNECTION_TYPE, "ready", {
+      roomID: roomState?.id,
+    });
   };
 
   const startGame = () => {
-    sendMessage(CONNECTION_TYPE, "start", { roomID: roomState?.id });
+    sendMessage(CONNECTION_TYPE, "start", {
+      roomID: roomState?.id,
+    });
   };
 
   const endGame = () => {
     sendMessage(CONNECTION_TYPE, "end");
   };
 
-  const syncGame = (apples: AppleType[], score: number) => {
-    sendMessage("apple", "playing", {
-      opponentPlate: apples,
-      opponentScore: score,
+  const syncGame = (
+    apples: AppleType[],
+    score: number,
+    lockColumnCount: number
+  ) => {
+    sendMessage(CONNECTION_TYPE, "playing", {
+      plate: apples,
+      score: score,
+      lockedColumnCount: gameState.lockedColumnCount,
+      opponentLockedColumnCount: lockColumnCount,
     });
   };
 
@@ -129,11 +145,16 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
   };
 
   const resetGame = () => {
-    setGameState({
-      apples: [],
-      score: 0,
-      opponentApples: [],
-      opponentScore: 0,
+    setGameState(initialGameState);
+  };
+  const initGame = () => {
+    const initApples = generateApples();
+    setGameState((prev) => ({
+      ...prev,
+      apples: initApples,
+    }));
+    sendMessage(CONNECTION_TYPE, "gameInit", {
+      plate: initApples,
     });
   };
 
@@ -171,32 +192,46 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         break;
       case "room:start": {
         if (!success) return;
-        const initApples = generateApples();
+
         setIsGameStarted(true);
-        setGameState((prev) => ({
-          ...prev,
-          apples: initApples,
-        }));
         setRoomState({
           id: payload.roomID,
           owner: payload.roomState.owner,
           status: payload.roomState.status,
         });
-        sendMessage("apple", "playing", {
-          opponentPlate: initApples,
-          opponentScore: 0,
-        });
 
+        initGame();
         break;
       }
-      case "playing":
+      case "gameInit": {
         if (!success) return;
+        const { opponentPlate } = payload;
+        setGameState((prev) => {
+          return {
+            ...prev,
+            opponentApples: opponentPlate,
+          };
+        });
+        break;
+      }
+      case "playing": {
+        if (!success) return;
+        const {
+          opponentPlate,
+          opponentScore,
+          lockedColumnCount,
+          opponentLockedColumnCount,
+        } = payload;
+
         setGameState((prev) => ({
           ...prev,
-          opponentApples: payload.opponentPlate,
-          opponentScore: payload.opponentScore,
+          opponentApples: opponentPlate,
+          opponentScore,
+          opponentLockedColumnCount,
+          lockedColumnCount,
         }));
         break;
+      }
     }
   };
 
@@ -205,6 +240,10 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    console.log("gameState", gameState);
+  }, [gameState]);
 
   return (
     <GameContext.Provider
@@ -222,6 +261,7 @@ export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
         setGameState,
         resetGame,
         syncGame,
+        initGame,
       }}
     >
       {children}

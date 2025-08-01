@@ -61,7 +61,6 @@ export const ConnectionProvider: React.FC<ConnectionProviderProps> = ({
     <ConnectionContext.Provider
       value={{
         CONNECTION_TYPE: "apple",
-        // playerID,
         isConnected,
         connect,
         disconnect,

@@ -2,6 +2,7 @@ import { Circle, Text } from "react-konva";
 
 export interface AppleType {
   id: string;
+  isLocked: boolean;
   x: number;
   y: number;
   value: number;
@@ -10,9 +11,10 @@ export interface AppleType {
 export interface AppleProps {
   apple: AppleType;
   cellSize: number;
+  isLocked: boolean;
 }
 
-const Apple: React.FC<AppleProps> = ({ apple, cellSize }) => {
+const Apple: React.FC<AppleProps> = ({ apple, cellSize, isLocked }) => {
   return (
     <>
       <Circle
@@ -20,7 +22,7 @@ const Apple: React.FC<AppleProps> = ({ apple, cellSize }) => {
         x={apple.x + cellSize / 2}
         y={apple.y + cellSize / 2}
         radius={15}
-        fill="red"
+        fill={isLocked ? "gray" : "red"}
         stroke="black"
       />
       <Text

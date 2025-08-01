@@ -9,7 +9,7 @@ const Lobby = () => {
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [newRoomId, setNewRoomId] = useState("");
   const { connectGame, isConnectedGame } = useGame();
-  const [tmpPlayerID, setTmpPlayerID] = useState("");
+  const [inputPlayerID, setInputPlayerID] = useState("");
   const { playerID } = usePlayer();
   const { roomList } = useRoom();
 
@@ -36,14 +36,14 @@ const Lobby = () => {
               <input
                 type="text"
                 id="playerID"
-                value={tmpPlayerID}
-                onChange={(e) => setTmpPlayerID(e.target.value)}
+                value={inputPlayerID}
+                onChange={(e) => setInputPlayerID(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 ease-in-out"
                 placeholder="您的名字..."
               />
               <button
                 onClick={() => {
-                  connectGame(tmpPlayerID);
+                  connectGame(inputPlayerID);
                 }}
                 className="mt-4 w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors duration-200"
               >
